@@ -6,6 +6,9 @@
     <!-- Boost Framework -->
     <bool name="config_supportsBoostFramework">false</bool>
 
+    <!-- Screen off delay -->
+    <integer name="config_screen_off_delay">1000</integer>
+
     <!-- More battery styles -->
     <!-- Signal (Airoo) -->
     <string name="config_batterymeterLandPerimeterPathSignal" translatable="false">
