@@ -1797,7 +1797,7 @@ final class DisplayPowerController implements AutomaticBrightnessController.Call
             // done in HighBrightnessModeController.
             if (mHbmController.getHighBrightnessMode() == BrightnessInfo.HIGH_BRIGHTNESS_MODE_HDR) {
                 if ((mBrightnessReasonTemp.modifier & BrightnessReason.MODIFIER_DIMMED) == 0
-                        || (mBrightnessReasonTemp.modifier & BrightnessReason.MODIFIER_LOW_POWER)
+                        && (mBrightnessReasonTemp.modifier & BrightnessReason.MODIFIER_LOW_POWER)
                         == 0) {
                     // We want to scale HDR brightness level with the SDR level, we also need to restore
                     // SDR brightness immediately when entering dim or low power mode.
