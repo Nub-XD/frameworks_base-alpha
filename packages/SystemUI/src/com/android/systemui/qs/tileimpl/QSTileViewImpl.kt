@@ -24,6 +24,7 @@ import android.content.res.ColorStateList
 import android.content.res.Configuration
 import android.content.res.Resources.ID_NULL
 import android.graphics.drawable.Drawable
+import android.graphics.drawable.LayerDrawable
 import android.graphics.drawable.RippleDrawable
 import android.os.Trace
 import android.os.UserHandle
@@ -72,7 +73,7 @@ open class QSTileViewImpl @JvmOverloads constructor(
         private const val LABEL_NAME = "label"
         private const val SECONDARY_LABEL_NAME = "secondaryLabel"
         private const val CHEVRON_NAME = "chevron"
-        const val UNAVAILABLE_ALPHA = 0.2f
+        const val UNAVAILABLE_ALPHA = 0.3f
         @VisibleForTesting
         internal const val TILE_STATE_RES_PREFIX = "tile_states_"
     }
@@ -96,9 +97,6 @@ open class QSTileViewImpl @JvmOverloads constructor(
             field = value
             updateHeight()
         }
-
-    private var activeAlpha: Float = 0f;
-    private var inactiveAlpha: Float = 0f;
 
     private val colorActive = Utils.getColorStateListDefaultColor(
             context, R.color.qs_color_accent_primary)
@@ -130,8 +128,10 @@ open class QSTileViewImpl @JvmOverloads constructor(
     protected var showRippleEffect = true
 
     private lateinit var ripple: RippleDrawable
-    private lateinit var colorBackgroundDrawable: Drawable
+    private lateinit var colorBackgroundDrawable: LayerDrawable
+    private var stateBackgroundLayer: LayerDrawable? = null
     private var paintColor: Int = 0
+    private var currentState: Int = 0
     private val singleAnimator: ValueAnimator = ValueAnimator().apply {
         setDuration(QS_ANIM_LENGTH)
         addUpdateListener { animation ->
@@ -171,13 +171,6 @@ open class QSTileViewImpl @JvmOverloads constructor(
         vertical = TileUtils.getQSTileVerticalLayout(context, if (vertical) 1 else 0)
         labelHide = TileUtils.getQSTileLabelHide(context)
         labelSize = TileUtils.getQSTileLabelSize(context)
-
-        var tAlpha = TypedValue()
-        context.resources.getValue(R.dimen.qs_active_alpha, tAlpha, true)
-        activeAlpha = tAlpha.getFloat()
-
-        context.resources.getValue(R.dimen.qs_inactive_alpha, tAlpha, true)
-        inactiveAlpha = tAlpha.getFloat()
 
         importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_YES
         clipChildren = false
@@ -296,7 +289,7 @@ open class QSTileViewImpl @JvmOverloads constructor(
 
     fun createTileBackground(): Drawable {
         ripple = mContext.getDrawable(R.drawable.qs_tile_background) as RippleDrawable
-        colorBackgroundDrawable = ripple.findDrawableByLayerId(R.id.background)
+        colorBackgroundDrawable = ripple.findDrawableByLayerId(R.id.background) as LayerDrawable
         return ripple
     }
 
@@ -605,8 +598,25 @@ open class QSTileViewImpl @JvmOverloads constructor(
     }
 
     private fun setColor(color: Int) {
-        colorBackgroundDrawable.mutate().setTint(color)
         paintColor = color
+        setStateLayer()
+    }
+
+    private fun setStateLayer() {
+        stateBackgroundLayer = when(currentState) {
+            Tile.STATE_ACTIVE -> mContext.getDrawable(
+                    R.drawable.qs_tile_active_layer) as? LayerDrawable
+            Tile.STATE_INACTIVE -> mContext.getDrawable(
+                    R.drawable.qs_tile_inactive_layer) as? LayerDrawable
+            else -> mContext.getDrawable(
+                    R.drawable.qs_tile_unavailable_layer) as? LayerDrawable
+        }
+
+        if (stateBackgroundLayer != null) {
+            var ld: LayerDrawable = colorBackgroundDrawable.mutate() as LayerDrawable
+            ld.setDrawableByLayerId(
+                    com.android.internal.R.id.qs_state_layer, stateBackgroundLayer)
+        }
     }
 
     private fun setLabelColor(color: Int) {
@@ -657,16 +667,11 @@ open class QSTileViewImpl @JvmOverloads constructor(
     }
 
     private fun getBackgroundColorForState(state: Int, disabledByPolicy: Boolean = false): Int {
+        currentState = state
         return when {
             state == Tile.STATE_UNAVAILABLE || disabledByPolicy -> colorUnavailable
-            state == Tile.STATE_ACTIVE ->
-                    if (activeAlpha > 0 && activeAlpha < 1)
-                        Utils.applyAlpha(activeAlpha, colorActive)
-                    else colorActive
-            state == Tile.STATE_INACTIVE ->
-                    if (inactiveAlpha > 0 && inactiveAlpha < 1)
-                        Utils.applyAlpha(inactiveAlpha, colorInactive)
-                    else 0
+            state == Tile.STATE_ACTIVE -> colorActive
+            state == Tile.STATE_INACTIVE -> colorInactive
             else -> {
                 Log.e(TAG, "Invalid state $state")
                 0

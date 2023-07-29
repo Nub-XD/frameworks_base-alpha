@@ -112,4 +112,6 @@
     <java-symbol type="string" name="config_batterymeterLandPowersavePathMiUIPill" />
     <java-symbol type="string" name="config_batterymeterLandErrorPerimeterPathMiUIPill" />
 
+    <java-symbol type="id" name="qs_state_layer" />
+
 </resources>
