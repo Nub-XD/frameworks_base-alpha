@@ -2483,67 +2483,25 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener, Dumpab
         mTelephonyListenerManager.addActiveDataSubscriptionIdListener(mPhoneStateListener);
         initializeSimState();
 
-        mFingerprintInteractiveToAuthProvider = interactiveToAuthProvider.orElse(null);
-
-        mSettingsObserver = new SettingsObserver(context, mHandler);
-        mSettingsObserver.observe();
-    }
-
-    private final class SettingsObserver extends ContentObserver {
-
-        private final Context mContext;
-
-        private final Uri mFaceUnlockMethod =
-                Settings.Secure.getUriFor(Settings.Secure.FACE_UNLOCK_METHOD);
-        private final Uri mTimeFormat =
-                Settings.System.getUriFor(Settings.System.TIME_12_24);
-
-        SettingsObserver(Context context, Handler handler) {
-            super(handler);
-            mContext = context;
-        }
-
-        void observe() {
-            ContentResolver resolver = mContext.getContentResolver();
-            resolver.registerContentObserver(
-                    mFaceUnlockMethod, false, this, UserHandle.USER_ALL);
-            resolver.registerContentObserver(
-                    mTimeFormat, false, this, UserHandle.USER_ALL);
-
-            updateFaceUnlockBehavior();
-        }
-
-        void unobserve(){
-            mContext.getContentResolver().unregisterContentObserver(this);
-        }
-
-        @Override
-        public void onChange(boolean selfChange, Uri uri) {
-            update(uri);
-        }
-
-        public void update(Uri uri) {
-            if (mFaceUnlockMethod.equals(uri)) {
-                updateFaceUnlockBehavior();
-            } else if (mTimeFormat.equals(uri)) {
+        mTimeFormatChangeObserver = new ContentObserver(mHandler) {
+            @Override
+            public void onChange(boolean selfChange) {
                 mHandler.sendMessage(mHandler.obtainMessage(
                         MSG_TIME_FORMAT_UPDATE,
                         Settings.System.getString(
                                 mContext.getContentResolver(),
                                 Settings.System.TIME_12_24)));
             }
-        }
-    }
+        };
 
-    private void updateFaceUnlockBehavior() {
-        ContentResolver resolver = mContext.getContentResolver();
-        if (mFaceAuthOnlyOnSecurityView){
-            mFaceUnlockBehavior = FACE_UNLOCK_BEHAVIOR_SWIPE;
-        }else{
-            mFaceUnlockBehavior = Settings.Secure.getIntForUser(resolver,
-                Settings.Secure.FACE_UNLOCK_METHOD, FACE_UNLOCK_BEHAVIOR_DEFAULT,
-                UserHandle.USER_CURRENT);
-        }
+        mContext.getContentResolver().registerContentObserver(
+                Settings.System.getUriFor(Settings.System.TIME_12_24),
+                false, mTimeFormatChangeObserver, UserHandle.USER_ALL);
+
+        mFingerprintInteractiveToAuthProvider = interactiveToAuthProvider.orElse(null);
+
+        mSettingsObserver = new SettingsObserver(mHandler);
+        mSettingsObserver.observe();
     }
 
     private void initializeSimState() {
@@ -2949,7 +2907,7 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener, Dumpab
                         || shouldListenForFingerprintAssistant
                         || (mKeyguardOccluded && mIsDreaming)
                         || (mKeyguardOccluded && userDoesNotHaveTrust
-                            && (mOccludingAppRequestingFp || isUdfps));
+                            && (mOccludingAppRequestingFp || isUdfps || mAlternateBouncerShowing));
 
         // Only listen if this KeyguardUpdateMonitor belongs to the primary user. There is an
         // instance of KeyguardUpdateMonitor for each user but KeyguardUpdateMonitor is user-aware.
@@ -3067,7 +3025,7 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener, Dumpab
                 && !mSwitchingUser && !faceDisabledForUser && userNotTrustedOrDetectionIsNeeded
                 && !mKeyguardGoingAway && biometricEnabledForUser
                 && faceAuthAllowedOrDetectionIsNeeded && mIsPrimaryUser
-                && (!mSecureCameraLaunched || mOccludingAppRequestingFace)
+                && (!mSecureCameraLaunched || mAlternateBouncerShowing)
                 && faceAndFpNotAuthenticated
                 && !mGoingToSleep
                 && isPostureAllowedForFaceAuth
@@ -4191,10 +4149,55 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener, Dumpab
         return BIOMETRIC_LOCKOUT_RESET_DELAY_MS;
     }
 
+    private void updateSettings() {
+        updateFaceUnlockBehavior();
+    }
+
+    private void updateFaceUnlockBehavior() {
+        ContentResolver resolver = mContext.getContentResolver();
+        if (mFaceAuthOnlyOnSecurityView){
+            mFaceUnlockBehavior = FACE_UNLOCK_BEHAVIOR_SWIPE;
+        }else{
+            mFaceUnlockBehavior = Settings.Secure.getIntForUser(resolver,
+                Settings.Secure.FACE_UNLOCK_METHOD, FACE_UNLOCK_BEHAVIOR_DEFAULT,
+                UserHandle.USER_CURRENT);
+        }
+    }
+
+    class SettingsObserver extends ContentObserver {
+        private ContentResolver mContentResolver;
+        SettingsObserver(Handler handler) {
+            super(handler);
+        }
+
+        void observe() {
+            mContentResolver = mContext.getContentResolver();
+            mContentResolver.registerContentObserver(Settings.Secure.getUriFor(
+                    Settings.Secure.FACE_UNLOCK_METHOD), false, this,
+                    UserHandle.USER_ALL);
+            updateSettings();
+        }
+
+        void unobserve(){
+            if (mContentResolver != null){
+                mContentResolver.unregisterContentObserver(this);
+            }
+        }
+
+        @Override
+        public void onChange(boolean selfChange) {
+            updateSettings();
+        }
+    }
+
     /**
      * Unregister all listeners.
      */
     public void destroy() {
+        if (mSettingsObserver != null) {
+            mSettingsObserver.unobserve();
+        }
+
         mStatusBarStateController.removeCallback(mStatusBarStateControllerListener);
         mTelephonyListenerManager.removeActiveDataSubscriptionIdListener(mPhoneStateListener);
         mSubscriptionManager.removeOnSubscriptionsChangedListener(mSubscriptionListener);
@@ -4203,8 +4206,8 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener, Dumpab
             mContext.getContentResolver().unregisterContentObserver(mDeviceProvisionedObserver);
         }
 
-        if (mSettingsObserver != null) {
-            mSettingsObserver.unobserve();
+        if (mTimeFormatChangeObserver != null) {
+            mContext.getContentResolver().unregisterContentObserver(mTimeFormatChangeObserver);
         }
 
         mUserTracker.removeCallback(mUserChangedCallback);
