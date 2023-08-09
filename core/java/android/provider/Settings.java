@@ -6365,10 +6365,64 @@ public final class Settings {
         public static final String VOWIFI_ICON_STYLE = "vowifi_icon_style";
 
         /**
-         * QS Header
+         * QS Header image index
+         * QS header image name format = "qs_header_image_" + QS_HEADER_IMAGE
          * @hide
          */
         public static final String QS_HEADER_IMAGE = "qs_header_image";
+
+        /**
+         * QS header image tint
+         * 0 - No tint
+         * 1 - Accent
+         * 2 - Color primary
+         * 3 - Color primary inverse
+         * 4 - Custom
+         * @hide
+         */
+        public static final String QS_HEADER_IMAGE_TINT = "qs_header_image_tint";
+
+        /**
+         * QS header image custom tint
+         * @hide
+         **/
+        public static final String QS_HEADER_IMAGE_TINT_CUSTOM = "qs_header_image_tint_custom";
+
+        /**
+         * QS header image alpha
+         * @hide
+         **/
+        public static final String QS_HEADER_IMAGE_ALPHA = "qs_header_image_alpha";
+
+        /**
+         * QS header image portrait height
+         * @hide
+         **/
+        public static final String QS_HEADER_IMAGE_HEIGHT_PORTRAIT = "qs_header_image_height_portrait";
+
+        /**
+         * QS header image landscape height
+         * @hide
+         **/
+        public static final String QS_HEADER_IMAGE_HEIGHT_LANDSCAPE = "qs_header_image_height_landscape";
+
+        /**
+         * Wether to enable QS header image in landscape mode
+         * @hide
+         **/
+        public static final String QS_HEADER_IMAGE_LANDSCAPE_ENABLED = "qs_header_image_landscape_enabled";
+
+        /**
+         * QS header image side padding
+         * @hide
+         **/
+         public static final String QS_HEADER_IMAGE_PADDING_SIDE = "qs_header_image_padding_side";
+
+         /**
+          * QS header image top padding
+          * @hide
+          **/
+        public static final String QS_HEADER_IMAGE_PADDING_TOP = "qs_header_image_padding_top";
 
         /**
          * Keys we no longer back up under the current schema, but want to continue to
